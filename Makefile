@@ -80,7 +80,7 @@ OBJDIR = .
 
 
 # List C source files here. (C dependencies are automatically generated.)
-SRC = main.c
+SRC = main.c dallas_one_wire.c
 
 
 # List C++ source files here. (C dependencies are automatically generated.)
