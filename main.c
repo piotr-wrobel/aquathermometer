@@ -6,8 +6,10 @@
 
 #include <avr/io.h>
 #include <avr/pgmspace.h>
-#include <util/delay.h>
+#include <avr/sleep.h>
+#include <avr/power.h>
 #include <avr/interrupt.h>
+#include <util/delay.h>
 #include "dallas_one_wire.h"
 #include "suart.h"
 
@@ -45,19 +47,25 @@ const char mess_wynik2[] PROGMEM=" C\r";
          * resecie) */ 
         MCUSR = 0; 
         WDTCR = (1 << WDCE) | (1 << WDE); //Time sequence to enable Watchdog Changes !
-        WDTCR = (1 << WDIE) | (1 << WDP2) | (1 << WDP1); //Ustawienie przerwania co 4 sekundy 
+        WDTCR = (1 << WDIE) | (1 << WDP3);// | (1 << WDP0); //Ustawienie przerwania co 4 sekund 
     } 
 #endif
 
 DALLAS_IDENTIFIER_LIST_t *onewires;
-uint8_t  wynik_szukania_onewire, messageBuf[10],temperatura[3] ={0xDD,ASCII_SPACE,ASCII_SPACE}; //Tu przewchowywana bedzie odczytana temperatura, poczatkowo -99-
+uint8_t  wynik_szukania_onewire, messageBuf[10],temperatura[3] ={0x00,0x00,0x00}; //Tu przewchowywana bedzie odczytana temperatura, poczatkowo -99-
+uint8_t wybudzenie=0;
 
 static void pgm_xmit(const char *s);
+void sleep(void);
 static void mierzTemperature(DALLAS_IDENTIFIER_LIST_t *onewires);
 static void odczytajTemperature(DALLAS_IDENTIFIER_LIST_t *onewires,uint8_t *messageBuf,uint8_t *temperatura);
+static void pokazTemperature(uint8_t *temperatura);
+
 
 int main (void)
 {
+	// DDRB |= (1<<PB1); //wyjscie do zasilania 18B20
+	// PORTB |= (1<<PB1);
 	pgm_xmit(mess1);
 	pgm_xmit(mess2);
 	
@@ -77,11 +85,15 @@ int main (void)
 	pgm_xmit(mess_ok);
 	while(1)
 	{
-		mierzTemperature(onewires); //Zlecamy pomiar temperatury
-		_delay_ms(1000); //Czekamy na pomiar
-		odczytajTemperature(onewires, messageBuf, temperatura);
-		_delay_ms(4000); //Czekamy
-		
+		if(!wybudzenie)
+			mierzTemperature(onewires); //Zlecamy pomiar temperatury
+		xmit(wybudzenie+ASCII_ZERO);
+		if(wybudzenie==1)
+			odczytajTemperature(onewires, messageBuf, temperatura);
+		pokazTemperature(temperatura);
+		if(++wybudzenie>5)
+			wybudzenie=0;
+		sleep();
 	}
 KONIEC:
 	pgm_xmit(mess_koniec);
@@ -90,8 +102,6 @@ KONIEC:
 
 ISR(WDT_vect)
 {
-	xmit('!');
-	xmit('\n');	
 }
 
 static void pgm_xmit(const char *s)
@@ -99,6 +109,28 @@ static void pgm_xmit(const char *s)
 	char c;
 	while(c = pgm_read_byte(s++))
 		xmit(c);
+}
+
+void sleep(void)
+{
+	cli();
+	set_sleep_mode(SLEEP_MODE_PWR_DOWN);
+	power_all_disable();
+	DDRB=0x00;
+	PORTB=0x00;
+	// power_usi_disable()
+	// power_adc_disable()
+	// power_timer0_disable()
+	// power_timer1_disable(); // OR ? power_all_disable() !
+	sleep_enable();
+	sei(); //first instruction after SEI is guaranteed to execute before any interrupt
+	sleep_cpu();
+	/* The program will continue from here. */
+	/* First thing to do is disable sleep. */
+	sleep_disable();
+	power_all_enable();
+	// DDRB |= (1<<PB1); //wyjscie do zasilania 18B20
+	// PORTB |= (1<<PB1);
 }
 
 static void mierzTemperature(DALLAS_IDENTIFIER_LIST_t *onewires)
@@ -119,21 +151,22 @@ static void odczytajTemperature(DALLAS_IDENTIFIER_LIST_t *onewires,uint8_t *mess
 	}
 	temperatura[0]=((messageBuf[1] & 0x07)<<4)|messageBuf[0]>>4; // Tutaj wartosci calkowite temp bez znaku - 7 bitow
 	temperatura[1]= (messageBuf[1]&0xF0)|(messageBuf[0]&0x0F); // 4 starsze bity to znak, mlodsze 4 to wartosc po przecinku
-	char znak='+';
+	temperatura[2]='+';
 	if(temperatura[1]&0xF0) //temperatura ujemna
 	{
 		temperatura[0]= ~temperatura[0];
 		temperatura[1]= ~temperatura[1];
-		znak='-';
+		temperatura[2]='-';
 	}
-	
+}
+
+static void pokazTemperature(uint8_t *temperatura)
+{
 	pgm_xmit(mess_wynik1);
-	xmit(znak);
+	xmit(temperatura[2]);
 	xmit((temperatura[0]/10)+ASCII_ZERO);
 	xmit((temperatura[0]%10)+ASCII_ZERO);
 	xmit(',');
 	xmit((((uint16_t)temperatura[1]*625)/1000)+ASCII_ZERO);
-	pgm_xmit(mess_wynik2);
+	pgm_xmit(mess_wynik2);	
 }
-
-
