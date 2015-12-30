@@ -7,7 +7,7 @@
 #include <avr/io.h>
 #include <avr/pgmspace.h>
 #include <util/delay.h>
-//#include <avr/interrupt.h>
+#include <avr/interrupt.h>
 #include "dallas_one_wire.h"
 #include "suart.h"
 
@@ -32,22 +32,22 @@ const char mess_wynik2[] PROGMEM=" C\r";
 
 
 
-// // Wylaczenie WatchDoga
-// #ifdef WDIF 
-    // static void __init3( 
-        // void ) 
-        // __attribute__ (( section( ".init3" ), naked, used )); 
-    // static void __init3( 
-        // void ) 
-    // { 
-        // /* wyłączenie watchdoga (w tych mikrokontrolerach, w których watchdog 
-         // * ma możliwość generowania przerwania pozostaje on też aktywny po 
-         // * resecie) */ 
-        // MCUSR = 0; 
-        // WDTCR = 1 << WDCE | 1 << WDE; 
-        // WDTCR = 0; 
-    // } 
-// #endif
+// Ustawienia Watchdog'a
+#ifdef WDIF 
+    static void __init3( 
+        void ) 
+        __attribute__ (( section( ".init3" ), naked, used )); 
+    static void __init3( 
+        void ) 
+    { 
+        /* wyłączenie watchdoga (w tych mikrokontrolerach, w których watchdog 
+         * ma możliwość generowania przerwania pozostaje on też aktywny po 
+         * resecie) */ 
+        MCUSR = 0; 
+        WDTCR = (1 << WDCE) | (1 << WDE); //Time sequence to enable Watchdog Changes !
+        WDTCR = (1 << WDIE) | (1 << WDP2) | (1 << WDP1); //Ustawienie przerwania co 4 sekundy 
+    } 
+#endif
 
 DALLAS_IDENTIFIER_LIST_t *onewires;
 uint8_t  wynik_szukania_onewire, messageBuf[10],temperatura[3] ={0xDD,ASCII_SPACE,ASCII_SPACE}; //Tu przewchowywana bedzie odczytana temperatura, poczatkowo -99-
@@ -86,6 +86,12 @@ int main (void)
 KONIEC:
 	pgm_xmit(mess_koniec);
 	while(1);
+}
+
+ISR(WDT_vect)
+{
+	xmit('!');
+	xmit('\n');	
 }
 
 static void pgm_xmit(const char *s)
@@ -129,3 +135,5 @@ static void odczytajTemperature(DALLAS_IDENTIFIER_LIST_t *onewires,uint8_t *mess
 	xmit((((uint16_t)temperatura[1]*625)/1000)+ASCII_ZERO);
 	pgm_xmit(mess_wynik2);
 }
+
+

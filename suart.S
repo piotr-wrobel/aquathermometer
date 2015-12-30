@@ -91,6 +91,7 @@ xmit:
 	DIR_IN
 #endif
 	out	_SFR_IO_ADDR(SREG), r0	;End of critical section
+	sei
 	ret
 .endfunc
 
@@ -126,6 +127,7 @@ rcvr:
 	brcc	4b	     	;All bits received?  no, continue
 
 	out	_SFR_IO_ADDR(SREG), r0	;End of critical section
+	sei
 	ret
 .endfunc
 
