@@ -13,7 +13,7 @@
 #include "dallas_one_wire.h"
 #include "suart.h"
 
-#define	SYSCLK		1000000UL
+#define	SYSCLK		500000UL
 
 #define ASCII_SPACE 0x20
 #define ASCII_ZERO 0x30
@@ -44,6 +44,11 @@ static void __init3(
 	MCUSR = 0; 
 	WDTCR = (1 << WDCE) | (1 << WDE); //Time sequence to enable Watchdog Changes !
 	WDTCR = (1 << WDIE) | (1 << WDP3);// | (1 << WDP0); //Ustawienie przerwania co 4 sekund 
+	//Ustawienie zegara na 500KHz
+	cli();
+	CLKPR = 0b10000000; //Prescaler change enable !
+	CLKPR = 0b00000100; // Set prescaler to 16
+	sei();
 } 
 
 DALLAS_IDENTIFIER_LIST_t *onewires;

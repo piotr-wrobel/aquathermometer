@@ -4,20 +4,20 @@
 ;---------------------------------------------------------------------------;
 ; Bit rate settings:
 ;
-;            1MHz  2MHz  4MHz  6MHz  8MHz  10MHz  12MHz  16MHz  20MHz
-;   2.4kbps   138     -     -     -     -      -      -      -      -
-;   4.8kbps    68   138     -     -     -      -      -      -      -
-;   9.6kbps    33    68   138   208     -      -      -      -      -
-;  19.2kbps     -    33    68   102   138    173    208      -      -
-;  38.4kbps     -     -    33    50    68     85    102    138    172
-;  57.6kbps     -     -    21    33    44     56     68     91    114
-; 115.2kbps     -     -     -     -    21     27     33     44     56
+;             .5MHz 1MHz  2MHz  4MHz  6MHz  8MHz  10MHz  12MHz  16MHz  20MHz
+;   2.4kbps      68  138     -     -     -     -      -      -      -      -
+;   4.8kbps      33   68   138     -     -     -      -      -      -      -
+;   9.6kbps       -   33    68   138   208     -      -      -      -      -
+;  19.2kbps       -    -    33    68   102   138    173    208      -      -
+;  38.4kbps       -    -     -    33    50    68     85    102    138    172
+;  57.6kbps       -    -     -    21    33    44     56     68     91    114
+; 115.2kbps       -    -     -     -     -    21     27     33     44     56
 
 .nolist
 #include <avr/io.h>
 .list
 
-#define	BPS	138	/* Bit delay. (see above table) */
+#define	BPS	68	/* Bit delay. (see above table) */
 #define	BIDIR	1	/* 0:Separated Tx/Rx, 1:Shared Tx/Rx */
 
 #define OUT_PIN PB4

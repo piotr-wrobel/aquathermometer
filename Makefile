@@ -62,7 +62,7 @@ MCU = attiny85
 #         F_CPU = 16000000
 #         F_CPU = 18432000
 #         F_CPU = 20000000
-F_CPU = 1000000
+F_CPU = 500000
 
 
 # Output format. (can be srec, ihex, binary)
@@ -153,7 +153,7 @@ CFLAGS += -O$(OPT)
 
 #CFLAGS += -fno-tree-scev-cprop
 CFLAGS += -fno-split-wide-types
-CFLAGS += -pedantic
+#CFLAGS += -pedantic
 #CFLAGS += -fgnu89-inline
 CFLAGS += -Wundef
 CFLAGS += -Wunreachable-code
