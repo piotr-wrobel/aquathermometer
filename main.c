@@ -13,7 +13,7 @@
 #include "dallas_one_wire.h"
 #include "suart.h"
 
-#define	SYSCLK		8000000UL
+#define	SYSCLK		1000000UL
 
 #define ASCII_SPACE 0x20
 #define ASCII_ZERO 0x30
@@ -35,21 +35,16 @@ const char mess_wynik2[] PROGMEM=" C\r";
 
 
 // Ustawienia Watchdog'a
-#ifdef WDIF 
-    static void __init3( 
-        void ) 
-        __attribute__ (( section( ".init3" ), naked, used )); 
-    static void __init3( 
-        void ) 
-    { 
-        /* wyłączenie watchdoga (w tych mikrokontrolerach, w których watchdog 
-         * ma możliwość generowania przerwania pozostaje on też aktywny po 
-         * resecie) */ 
-        MCUSR = 0; 
-        WDTCR = (1 << WDCE) | (1 << WDE); //Time sequence to enable Watchdog Changes !
-        WDTCR = (1 << WDIE) | (1 << WDP3);// | (1 << WDP0); //Ustawienie przerwania co 4 sekund 
-    } 
-#endif
+static void __init3( 
+	void ) 
+	__attribute__ (( section( ".init3" ), naked, used )); 
+static void __init3( 
+	void ) 
+{ 
+	MCUSR = 0; 
+	WDTCR = (1 << WDCE) | (1 << WDE); //Time sequence to enable Watchdog Changes !
+	WDTCR = (1 << WDIE) | (1 << WDP3);// | (1 << WDP0); //Ustawienie przerwania co 4 sekund 
+} 
 
 DALLAS_IDENTIFIER_LIST_t *onewires;
 uint8_t  wynik_szukania_onewire, messageBuf[10],temperatura[3] ={0x00,0x00,0x00}; //Tu przewchowywana bedzie odczytana temperatura, poczatkowo -99-

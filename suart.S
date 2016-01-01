@@ -17,7 +17,7 @@
 #include <avr/io.h>
 .list
 
-#define	BPS	44	/* Bit delay. (see above table) */
+#define	BPS	138	/* Bit delay. (see above table) */
 #define	BIDIR	1	/* 0:Separated Tx/Rx, 1:Shared Tx/Rx */
 
 #define OUT_PIN PB4
