@@ -2,11 +2,16 @@
 /* Termometr AQUA - Attiny85   code by pvglab      */
 /*-------------------------------------------------*/
 
-#define DEBUG
+//#define DEBUG
+#define UART
 
 #define TEMP_MINIMALNA 23
 #define TEMP_MAKSYMALNA 27
 #define BATERIA_MINIMUM 2600
+
+#define BATERIA_WYCZERPANA 2
+#define AWARIA_CZUJNIKA 1
+#define OK 0
 
 #include <avr/io.h>
 #include <avr/pgmspace.h>
@@ -16,7 +21,7 @@
 #include <util/delay.h>
 #include "dallas_one_wire.h"
 
-#ifdef DEBUG
+#ifdef UART
 #include "suart.h"
 #endif
 #define	SYSCLK		500000UL
@@ -34,9 +39,14 @@
 #define CONVERT_T_COMMAND 0x44
 #define READ_SCRATCHPAD_COMMAND 0xBE
 
-#ifdef DEBUG
-const char mess1[] PROGMEM="\r\n\nPomiar temperatury\r\n";
+#ifdef UART
+const char mess1[] PROGMEM="\r\n\nTermometr\r\n";
 const char mess2[] PROGMEM="Szukam czujnika...\r\n";
+#ifdef DEBUG
+const char mess3[] PROGMEM="licznik(00FF):licznik(0004)\r\n";
+#else
+const char mess3[] PROGMEM="licznik(0x00FF):licznik(0x0025)\r\n";
+#endif
 const char mess_ok[] PROGMEM="OK: czujnik znaleziony\r\n\n";
 const char mess_err1[] PROGMEM="ERR: brak czujnika\r\n";
 const char mess_err2[] PROGMEM="ERR: wiecej niz jeden czujnik\r\n";
@@ -72,10 +82,13 @@ static void __init3(
 
 DALLAS_IDENTIFIER_LIST_t *onewires;
 uint8_t  wynik_szukania_onewire, messageBuf[10],temperatura[4] ={0x00,0x00,0x00,0x00}; //Tu przewchowywana bedzie odczytana temperatura, poczatkowo -99-
-uint8_t wybudzenie=0;
+char napis[5];
+uint8_t wybudzenie=0, wybudzenie_2=0;
 uint16_t napiecie_baterii;
-#ifdef DEBUG
+#ifdef UART
 static void pgm_xmit(const char *s);
+static void  string_xmit(char *s);
+static void UARTuitoa(uint16_t liczba, char *string);
 #endif
 void alert(uint8_t DIODA);
 void sleep(void);
@@ -92,14 +105,15 @@ int main (void)
 	PORTB &= ~((1<<YELLOW) | (1<<GREEN) | (1<<RED)); //Po restarcie mrugniemy wszystkimi diodami testowo
 	_delay_ms(50);
 	PORTB |= (1<<YELLOW) | (1<<GREEN) | (1<<RED);
-#ifdef DEBUG	
+#ifdef UART	
 	pgm_xmit(mess1);
+	pgm_xmit(mess3);
 	pgm_xmit(mess2);
 #endif	
 	wynik_szukania_onewire=dallas_search_identifiers();
 	if(wynik_szukania_onewire) //szukamy urzadzen - 0 gdy przeszukanie udane
 	{
-#ifdef DEBUG		
+#ifdef UART		
 		pgm_xmit(mess_err1);
 #endif
 		goto KONIEC;
@@ -107,42 +121,53 @@ int main (void)
 	onewires=get_identifier_list();
 	if(onewires->num_devices!=1) //Ma byc tylko jedno urządzenie póki co :)
 	{
-#ifdef DEBUG
+#ifdef UART
 		pgm_xmit(mess_err2);
 #endif
 		goto KONIEC;
 	}	
-#ifdef DEBUG
+#ifdef UART
 	pgm_xmit(mess_ok);
 #endif
 	while(1)
 	{
 		if(!wybudzenie)
 			mierzTemperature(onewires); //Zlecamy pomiar temperatury
-#ifdef DEBUG		
-		xmit(wybudzenie+ASCII_ZERO);
+#ifdef UART		
+		UARTuitoa(wybudzenie_2,napis);
+		string_xmit(napis);
+		xmit(':');
+		UARTuitoa(wybudzenie,napis);
+		string_xmit(napis);
+		xmit('>');
 #endif
 		if(wybudzenie==1)
 		{
 			odczytajTemperature(onewires, messageBuf, temperatura);
-			napiecie_baterii=getVCC();
-#ifdef DEBUG
-			pokaz_VCC(napiecie_baterii);
+			if(!wybudzenie_2) //Pomiar napiecia tylko przy przepełnieniu drugiego licznika
+			{
+				napiecie_baterii=getVCC();
+#ifdef UART
+				pokaz_VCC(napiecie_baterii);
 #endif
-			if(napiecie_baterii < BATERIA_MINIMUM)
-				temperatura[3]=2; //Wykorzystamy ta tablice, by przekazac info i wyczerpanej baterii
+				if(napiecie_baterii < BATERIA_MINIMUM)
+					temperatura[3]=BATERIA_WYCZERPANA; //Wykorzystamy ta tablice, by przekazac info i wyczerpanej baterii
+			}
 		}
 		pokazTemperature(temperatura);
 #ifdef DEBUG
-		if(++wybudzenie>2)
+		if(++wybudzenie>4) //Pierwszy licznik liczy do 20 sekund (5 x 4 sekundy WD)
 #else
-		if(++wybudzenie>37)
+		if(++wybudzenie>37) //Pierwszy licznik liczy do 5 minut (38 x 8 sekund WD)
 #endif
+		{	
 			wybudzenie=0;
+			wybudzenie_2++; //Drugi licznik to 256 cykli pierwszego licznika, czyli odpowiednio
+		}					// 85 minut lub około 21 godzin
 		sleep();
 	}
 KONIEC:
-#ifdef DEBUG
+#ifdef UART
 	pgm_xmit(mess_koniec);
 #endif
 	alert(YELLOW);	
@@ -153,12 +178,35 @@ ISR(WDT_vect)
 {
 }
 
-#ifdef DEBUG
+#ifdef UART
 static void pgm_xmit(const char *s)
 {
 	char c;
 	while(c = pgm_read_byte(s++))
 		xmit(c);
+}
+
+static void  string_xmit(char *s)
+{
+    uint8_t cnt = 0;
+	while (s[cnt])
+		xmit(s[cnt++]);
+}
+
+static void UARTuitoa(uint16_t liczba, char *string)
+{
+	uint8_t nibble=0,pozycja;
+	for(pozycja=0;pozycja<4;pozycja++)
+	{
+		nibble=(liczba>>12);
+		liczba=(liczba<<4);
+		if(nibble <= 9)
+			nibble+=48;
+		else
+			nibble+=55;
+		string[pozycja]=nibble;
+	}
+	string[pozycja]=0;
 }
 #endif
 
@@ -208,13 +256,15 @@ static void odczytajTemperature(DALLAS_IDENTIFIER_LIST_t *onewires,uint8_t *mess
 	dallas_read_buffer(messageBuf,2);
 	if(!dallas_reset())
 	{
-#ifdef DEBUG
+#ifdef UART
 		pgm_xmit(mess_err3); // brak komunikacji z czujnikiem temperatury
 #endif
-		temperatura[3]=1;
+		if(temperatura[3] != BATERIA_WYCZERPANA) //Tylko gdy bateria jeszcze sprawna, ma sens komunikowac awarie czujnika
+			temperatura[3]= AWARIA_CZUJNIKA;
 		return;
 	}
-	temperatura[3]=0;
+	if(temperatura[3] != BATERIA_WYCZERPANA)
+		temperatura[3]= OK;
 	temperatura[0]=((messageBuf[1] & 0x07)<<4)|messageBuf[0]>>4; // Tutaj wartosci calkowite temp bez znaku - 7 bitow
 	temperatura[1]= (messageBuf[1]&0xF0)|(messageBuf[0]&0x0F); // 4 starsze bity to znak, mlodsze 4 to wartosc po przecinku
 	temperatura[2]='+';
@@ -228,7 +278,7 @@ static void odczytajTemperature(DALLAS_IDENTIFIER_LIST_t *onewires,uint8_t *mess
 
 static void pokazTemperature(uint8_t *temperatura)
 {
-#ifdef DEBUG	
+#ifdef UART	
 	pgm_xmit(mess_wynik1);
 	xmit(temperatura[2]);
 	xmit((temperatura[0]/10)+ASCII_ZERO);
@@ -237,9 +287,9 @@ static void pokazTemperature(uint8_t *temperatura)
 	xmit((((uint16_t)temperatura[1]*625)/1000)+ASCII_ZERO);
 	pgm_xmit(mess_wynik2);
 #endif
-	if(temperatura[3])
+	if(temperatura[3] != OK)
 	{
-		if(temperatura[3]>1)
+		if(temperatura[3] == BATERIA_WYCZERPANA)
 			alert(RED);
 		else
 			alert(YELLOW);
