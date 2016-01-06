@@ -2,7 +2,7 @@
 /* Termometr AQUA - Attiny85   code by pvglab      */
 /*-------------------------------------------------*/
 
-//#define DEBUG
+#define DEBUG
 #define UART
 
 #define TEMP_MINIMALNA 23
@@ -69,9 +69,9 @@ static void __init3(
 	MCUSR = 0; 
 	WDTCR = (1 << WDCE) | (1 << WDE); //Time sequence to enable Watchdog Changes !
 #ifdef DEBUG
-	WDTCR = (1 << WDIE) | (1 << WDP3); //Ustawienie przerwania co 4 sekundy
+	WDTCR = (1 << WDE) | (1 << WDIE) | (1 << WDP3); //Ustawienie przerwania co 4 sekundy, wlaczenie WD
 #else
-	WDTCR = (1 << WDIE) | (1 << WDP3) | (1 << WDP0); //Ustawienie przerwania co 8 sekund
+	WDTCR = (1 << WDE) | (1 << WDIE) | (1 << WDP3) | (1 << WDP0); //Ustawienie przerwania co 8 sekund, wlaczenie WD
 #endif
 	//Ustawienie zegara na 500KHz
 	cli();
@@ -96,15 +96,16 @@ static void mierzTemperature(DALLAS_IDENTIFIER_LIST_t *onewires);
 static void odczytajTemperature(DALLAS_IDENTIFIER_LIST_t *onewires,uint8_t *messageBuf,uint8_t *temperatura);
 static void pokazTemperature(uint8_t *temperatura);
 uint16_t getVCC(void);
+#ifdef UART
 void pokaz_VCC(uint16_t napiecie_baterii);
-
+#endif
 
 int main (void)
 {
-	DDRB |= (1<<YELLOW) | (1<<GREEN) | (1<<RED); //wyjscie do LED
-	PORTB &= ~((1<<YELLOW) | (1<<GREEN) | (1<<RED)); //Po restarcie mrugniemy wszystkimi diodami testowo
+	DDR |= (1<<YELLOW) | (1<<GREEN) | (1<<RED); //wyjscie do LED
+	PORT &= ~((1<<YELLOW) | (1<<GREEN) | (1<<RED)); //Po restarcie mrugniemy wszystkimi diodami testowo
 	_delay_ms(50);
-	PORTB |= (1<<YELLOW) | (1<<GREEN) | (1<<RED);
+	PORT |= (1<<YELLOW) | (1<<GREEN) | (1<<RED);
 #ifdef UART	
 	pgm_xmit(mess1);
 	pgm_xmit(mess3);
@@ -164,6 +165,8 @@ int main (void)
 			wybudzenie=0;
 			wybudzenie_2++; //Drugi licznik to 256 cykli pierwszego licznika, czyli odpowiednio
 		}					// 85 minut lub około 21 godzin
+		
+		WDTCR |= (1 << WDIE); //Odnowienie przerwania, czyli odroczenie resetu :)
 		sleep();
 	}
 KONIEC:
@@ -174,9 +177,7 @@ KONIEC:
 	while(1);
 }
 
-ISR(WDT_vect)
-{
-}
+ISR(WDT_vect){}
 
 #ifdef UART
 static void pgm_xmit(const char *s)
@@ -212,13 +213,13 @@ static void UARTuitoa(uint16_t liczba, char *string)
 
 void alert(uint8_t DIODA)
 {
-	PORTB &= ~(1<<DIODA);
+	PORT &= ~(1<<DIODA);
 	_delay_ms(50);
-	PORTB |= (1<<DIODA);
+	PORT |= (1<<DIODA);
 	_delay_ms(100);
-	PORTB &= ~(1<<DIODA);
+	PORT &= ~(1<<DIODA);
 	_delay_ms(50);
-	PORTB |= (1<<DIODA);	
+	PORT |= (1<<DIODA);	
 }
 
 void sleep(void)
@@ -226,8 +227,8 @@ void sleep(void)
 	cli();
 	set_sleep_mode(SLEEP_MODE_PWR_DOWN);
 	power_all_disable();
-	DDRB=0x00;
-	PORTB=0x00;
+	DDR=0x00;
+	PORT=0x00;
 	// power_usi_disable()
 	// power_adc_disable()
 	// power_timer0_disable()
@@ -239,8 +240,8 @@ void sleep(void)
 	/* First thing to do is disable sleep. */
 	sleep_disable();
 	power_all_enable();
-	DDRB |= (1<<YELLOW) | (1<<GREEN) | (1<<RED); //wyjscie do LED
-	PORTB |= (1<<YELLOW) | (1<<GREEN) | (1<<RED);
+	DDR |= (1<<YELLOW) | (1<<GREEN) | (1<<RED); //wyjscie do LED
+	PORT |= (1<<YELLOW) | (1<<GREEN) | (1<<RED);
 }
 
 static void mierzTemperature(DALLAS_IDENTIFIER_LIST_t *onewires)
@@ -296,13 +297,13 @@ static void pokazTemperature(uint8_t *temperatura)
 		return;
 	}
 	if(temperatura[0] < TEMP_MINIMALNA)
-		PORTB &= ~(1<<YELLOW);
+		PORT &= ~(1<<YELLOW);
 	if(temperatura[0] >= TEMP_MINIMALNA && temperatura[0] < TEMP_MAKSYMALNA )
-		PORTB &= ~(1<<GREEN);
+		PORT &= ~(1<<GREEN);
 	if(temperatura[0] >= TEMP_MAKSYMALNA)
-		PORTB &= ~(1<<RED);
+		PORT &= ~(1<<RED);
 	_delay_ms(50);
-	PORTB |= (1<<YELLOW) | (1<<GREEN) | (1<<RED);
+	PORT |= (1<<YELLOW) | (1<<GREEN) | (1<<RED);
 }
 
 uint16_t getVCC(void) 
@@ -323,7 +324,7 @@ uint16_t getVCC(void)
 	ADCSRA &= ~(1<<ADEN); //Wyłączenie przetwornika AD
 	return (uint16_t)(((uint32_t)1024 * 1100) / val);
 }
-
+#ifdef UART
 void pokaz_VCC(uint16_t napiecie_baterii)
 {
 	pgm_xmit(mess_bateria1);
@@ -334,3 +335,4 @@ void pokaz_VCC(uint16_t napiecie_baterii)
 	pgm_xmit(mess_bateria2);	
 	
 }
+#endif
