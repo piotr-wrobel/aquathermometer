@@ -21,8 +21,8 @@
 #define	BPS	7	/* Bit delay. (see above table) */
 #define	BIDIR	1	/* 0:Separated Tx/Rx, 1:Shared Tx/Rx */
 
-#define OUT_PIN PB4
-#define IN_PIN PB4
+#define OUT_PIN PB0
+#define IN_PIN PB0
 #define PORT_SUART PORTB
 #define DDR_SUART DDRB
 

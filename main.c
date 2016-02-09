@@ -1,9 +1,9 @@
 /*-------------------------------------------------*/
-/* Termometr AQUA - Attiny85   code by pvglab      */
+/* Termometr AQUA - Attiny45/85   code by pvglab      */
 /*-------------------------------------------------*/
 
-//#define DEBUG
-//#define UART
+#define DEBUG
+#define UART
 
 #define TEMP_MINIMALNA 23
 #define TEMP_MAKSYMALNA 27
