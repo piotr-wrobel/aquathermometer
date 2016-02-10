@@ -35,6 +35,8 @@
 #define GREEN PB1
 #define YELLOW PB0
 
+#define PHOTOTRANSISTOR PB4
+
 //DS18B20 commands
 #define CONVERT_T_COMMAND 0x44
 #define READ_SCRATCHPAD_COMMAND 0xBE
@@ -56,6 +58,8 @@ const char mess_wynik1[] PROGMEM="Wynik pomiaru: ";
 const char mess_wynik2[] PROGMEM=" C\r";
 const char mess_bateria1[] PROGMEM="Napiecie baterii: ";
 const char mess_bateria2[] PROGMEM="mV\r\n";
+const char mess_swiatlo1[] PROGMEM="Poziom swiatla: ";
+const char mess_swiatlo2[] PROGMEM="/1024; ";
 #endif
 
 
@@ -96,8 +100,11 @@ static void mierzTemperature(DALLAS_IDENTIFIER_LIST_t *onewires);
 static void odczytajTemperature(DALLAS_IDENTIFIER_LIST_t *onewires,uint8_t *messageBuf,uint8_t *temperatura);
 static void pokazTemperature(uint8_t *temperatura);
 uint16_t getVCC(void);
+uint16_t getLightLevel(void);
 #ifdef UART
+void pokazLiczbe(uint16_t liczba);
 void pokaz_VCC(uint16_t napiecie_baterii);
+void pokazPoziomSwiatla(uint16_t poziom_swiatla);
 #endif
 
 int main (void)
@@ -155,6 +162,9 @@ int main (void)
 					temperatura[3]=BATERIA_WYCZERPANA; //Wykorzystamy ta tablice, by przekazac info i wyczerpanej baterii
 			}
 		}
+#ifdef DEBUG
+		pokazPoziomSwiatla(getLightLevel());
+#endif
 		pokazTemperature(temperatura);
 #ifdef DEBUG
 		if(++wybudzenie>4) //Pierwszy licznik liczy do 20 sekund (5 x 4 sekundy WD)
@@ -324,15 +334,57 @@ uint16_t getVCC(void)
 	ADCSRA &= ~(1<<ADEN); //Wyłączenie przetwornika AD
 	return (uint16_t)(((uint32_t)1024 * 1100) / val);
 }
+uint16_t getLightLevel(void) 
+{
+	PORT |= (1<<PHOTOTRANSISTOR); //Zasilanie na fototranzystor przez R podciagajacy na porcie
+	ADCSRA |= (1<<ADEN); //Włączenie przetwornika AD
+	ADCSRA |= (1<<ADPS1) | (1<<ADPS0); //Preskaler 8 dla przetwornika AD (przy 0.5MHz clk)
+	ADMUX = (1<<MUX1); // Vcc as Vref and connect ADC2(PB4)
+	ADCSRA |= (1<<ADSC); // Convert
+	_delay_ms(1);
+	while (ADCSRA & (1<<ADSC));
+	uint8_t low = ADCL;
+	uint16_t val = ((ADCH&0x03) << 8) | low;
+	//discard previous result
+	ADCSRA |= (1<<ADSC); // Convert
+	while (ADCSRA & (1<<ADSC));
+	low = ADCL;
+	val = ((ADCH&0x03) << 8) | low;
+	_delay_ms(1);
+	ADCSRA |= (1<<ADSC); // Convert
+	while (ADCSRA & (1<<ADSC));
+	low = ADCL;
+	val += ((ADCH&0x03) << 8) | low;
+	_delay_ms(1);
+	ADCSRA |= (1<<ADSC); // Convert
+	while (ADCSRA & (1<<ADSC));
+	low = ADCL;
+	val += ((ADCH&0x03) << 8) | low;
+	
+	ADCSRA &= ~(1<<ADEN); //Wyłączenie przetwornika AD
+	PORT &= ~(1<<PHOTOTRANSISTOR); //Odlaczamy fototranzystor
+	return val/3;
+}
 #ifdef UART
+void pokazLiczbe(uint16_t liczba)
+{
+	xmit((liczba/1000)+ASCII_ZERO);
+	xmit(((liczba%1000)/100)+ASCII_ZERO);
+	xmit(((liczba%100)/10)+ASCII_ZERO);
+	xmit((liczba%10)+ASCII_ZERO);
+}
 void pokaz_VCC(uint16_t napiecie_baterii)
 {
 	pgm_xmit(mess_bateria1);
-	xmit((napiecie_baterii/1000)+ASCII_ZERO);
-	xmit(((napiecie_baterii%1000)/100)+ASCII_ZERO);
-	xmit(((napiecie_baterii%100)/10)+ASCII_ZERO);
-	xmit(ASCII_ZERO); //jednostki sobie darujemy :)
+	pokazLiczbe(napiecie_baterii);
 	pgm_xmit(mess_bateria2);	
 	
 }
+void pokazPoziomSwiatla(uint16_t poziom_swiatla)
+{
+	pgm_xmit(mess_swiatlo1);
+	pokazLiczbe(poziom_swiatla);
+	pgm_xmit(mess_swiatlo2);	
+}
 #endif
+
