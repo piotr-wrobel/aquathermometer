@@ -2,10 +2,13 @@
 /* Termometr AQUA - Attiny45/85   code by pvglab      */
 /*-------------------------------------------------*/
 
-#define DEBUG
-#define UART
-
-#define TEMP_MINIMALNA 23
+//#define DEBUG
+//#define UART
+#ifdef DEBUG //W trybie DEBUG obnizony dolny prog, by latwiej debugowac PWM na zielonej LED
+	#define TEMP_MINIMALNA 20
+#else
+	#define TEMP_MINIMALNA 23
+#endif
 #define TEMP_MAKSYMALNA 27
 #define BATERIA_MINIMUM 2600
 
@@ -45,7 +48,7 @@
 const char mess1[] PROGMEM="\r\n\nTermometr\r\n";
 const char mess2[] PROGMEM="Szukam czujnika...\r\n";
 #ifdef DEBUG
-const char mess3[] PROGMEM="licznik(00FF):licznik(0004)\r\n";
+const char mess3[] PROGMEM="licznik(0x00FF):licznik(0x0004)\r\n";
 #else
 const char mess3[] PROGMEM="licznik(0x00FF):licznik(0x0025)\r\n";
 #endif
@@ -59,7 +62,7 @@ const char mess_wynik2[] PROGMEM=" C\r";
 const char mess_bateria1[] PROGMEM="Napiecie baterii: ";
 const char mess_bateria2[] PROGMEM="mV\r\n";
 const char mess_swiatlo1[] PROGMEM="Poziom swiatla: ";
-const char mess_swiatlo2[] PROGMEM="/1024; ";
+const char mess_swiatlo2[] PROGMEM="/1024\r\n; ";
 #endif
 
 
@@ -88,7 +91,7 @@ DALLAS_IDENTIFIER_LIST_t *onewires;
 uint8_t  wynik_szukania_onewire, messageBuf[10],temperatura[4] ={0x00,0x00,0x00,0x00}; //Tu przewchowywana bedzie odczytana temperatura, poczatkowo -99-
 char napis[5];
 uint8_t wybudzenie=0, wybudzenie_2=0;
-uint16_t napiecie_baterii;
+uint16_t napiecie_baterii,poziom_swiatla=0;
 #ifdef UART
 static void pgm_xmit(const char *s);
 static void  string_xmit(char *s);
@@ -98,7 +101,7 @@ void alert(uint8_t DIODA);
 void sleep(void);
 static void mierzTemperature(DALLAS_IDENTIFIER_LIST_t *onewires);
 static void odczytajTemperature(DALLAS_IDENTIFIER_LIST_t *onewires,uint8_t *messageBuf,uint8_t *temperatura);
-static void pokazTemperature(uint8_t *temperatura);
+static void pokazTemperature(uint8_t *temperatura, uint16_t poziom_swiatla);
 uint16_t getVCC(void);
 uint16_t getLightLevel(void);
 #ifdef UART
@@ -161,11 +164,13 @@ int main (void)
 				if(napiecie_baterii < BATERIA_MINIMUM)
 					temperatura[3]=BATERIA_WYCZERPANA; //Wykorzystamy ta tablice, by przekazac info i wyczerpanej baterii
 			}
-		}
-#ifdef DEBUG
-		pokazPoziomSwiatla(getLightLevel());
+			if(temperatura[3]==OK) //Jesli z bateria i czujnikiem wszystko ok, to zmierzymy poziom swiatla
+				poziom_swiatla=getLightLevel();
+#ifdef UART
+			pokazPoziomSwiatla(poziom_swiatla);
 #endif
-		pokazTemperature(temperatura);
+		}
+		pokazTemperature(temperatura,poziom_swiatla);
 #ifdef DEBUG
 		if(++wybudzenie>4) //Pierwszy licznik liczy do 20 sekund (5 x 4 sekundy WD)
 #else
@@ -250,8 +255,8 @@ void sleep(void)
 	/* First thing to do is disable sleep. */
 	sleep_disable();
 	power_all_enable();
-	DDR |= (1<<YELLOW) | (1<<GREEN) | (1<<RED); //wyjscie do LED
 	PORT |= (1<<YELLOW) | (1<<GREEN) | (1<<RED);
+	DDR |= (1<<YELLOW) | (1<<GREEN) | (1<<RED); //wyjscie do LED
 }
 
 static void mierzTemperature(DALLAS_IDENTIFIER_LIST_t *onewires)
@@ -287,7 +292,7 @@ static void odczytajTemperature(DALLAS_IDENTIFIER_LIST_t *onewires,uint8_t *mess
 	}
 }
 
-static void pokazTemperature(uint8_t *temperatura)
+static void pokazTemperature(uint8_t *temperatura, uint16_t poziom_swiatla)
 {
 #ifdef UART	
 	pgm_xmit(mess_wynik1);
@@ -306,14 +311,26 @@ static void pokazTemperature(uint8_t *temperatura)
 			alert(YELLOW);
 		return;
 	}
+	if(temperatura[0] >= TEMP_MINIMALNA && temperatura[0] < TEMP_MAKSYMALNA )
+	{
+		//Temperatura jest optymalna, wezmiemy pod uwage poziom swiatla by nie razic zbytnio diodą w nocy :)
+		//PORT &= ~(1<<GREEN);
+		TCCR0A = 1<<COM0B1 | /*1<<COM0B0 | */ 1<<WGM01 | 1<<WGM00; //Fast PWM on OC0B, clear on compare - set on bottom
+		OCR0B = (poziom_swiatla>>2) & 0xFF; //Wywalamy dwa najmlodsze bity z 10 bitowego wyniku
+		TCCR0B = (1 << CS00); // start timer, no prescale
+		_delay_ms(50);
+		TCCR0B=0; //Wylaczenie PWM
+		TCCR0A=0;
+		PORT |= (1<<YELLOW) | (1<<GREEN) | (1<<RED); //Wylaczamy wszystkie LED
+		return;
+		
+	}
 	if(temperatura[0] < TEMP_MINIMALNA)
 		PORT &= ~(1<<YELLOW);
-	if(temperatura[0] >= TEMP_MINIMALNA && temperatura[0] < TEMP_MAKSYMALNA )
-		PORT &= ~(1<<GREEN);
 	if(temperatura[0] >= TEMP_MAKSYMALNA)
 		PORT &= ~(1<<RED);
 	_delay_ms(50);
-	PORT |= (1<<YELLOW) | (1<<GREEN) | (1<<RED);
+	PORT |= (1<<YELLOW) | (1<<GREEN) | (1<<RED); //Wylaczamy wszystkie LED
 }
 
 uint16_t getVCC(void) 
