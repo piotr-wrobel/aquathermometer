@@ -316,7 +316,8 @@ static void pokazTemperature(uint8_t *temperatura, uint16_t poziom_swiatla)
 		//Temperatura jest optymalna, wezmiemy pod uwage poziom swiatla by nie razic zbytnio diodą w nocy :)
 		//PORT &= ~(1<<GREEN);
 		TCCR0A = 1<<COM0B1 | /*1<<COM0B0 | */ 1<<WGM01 | 1<<WGM00; //Fast PWM on OC0B, clear on compare - set on bottom
-		OCR0B = (poziom_swiatla>>2) & 0xFF; //Wywalamy dwa najmlodsze bity z 10 bitowego wyniku
+		OCR0B = (poziom_swiatla>>2) & 0xFE; //Obcinamy 2 najmlodsze bity wyniku by miec 8 bitow z pomiaru 
+		// i trzeci zerujemy, aby zielona dioda nigdy nie byla calkiem wygaszona
 		TCCR0B = (1 << CS00); // start timer, no prescale
 		_delay_ms(50);
 		TCCR0B=0; //Wylaczenie PWM
