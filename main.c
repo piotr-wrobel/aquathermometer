@@ -67,13 +67,13 @@ const char mess_swiatlo2[] PROGMEM="/1024\r\n; ";
 
 
 // Ustawienia Watchdog'a
-static void __init3( 
-	void ) 
-	__attribute__ (( section( ".init3" ), naked, used )); 
-static void __init3( 
-	void ) 
-{ 
-	MCUSR = 0; 
+static void __init3(
+	void )
+	__attribute__ (( section( ".init3" ), naked, used ));
+static void __init3(
+	void )
+{
+	MCUSR = 0;
 	WDTCR = (1 << WDCE) | (1 << WDE); //Time sequence to enable Watchdog Changes !
 #ifdef DEBUG
 	WDTCR = (1 << WDE) | (1 << WDIE) | (1 << WDP3); //Ustawienie przerwania co 4 sekundy, wlaczenie WD
@@ -85,7 +85,7 @@ static void __init3(
 	CLKPR = 0b10000000; //Prescaler change enable !
 	CLKPR = 0b00000100; // Set prescaler to 16
 	sei();
-} 
+}
 
 DALLAS_IDENTIFIER_LIST_t *onewires;
 uint8_t  wynik_szukania_onewire, messageBuf[10],temperatura[4] ={0x00,0x00,0x00,0x00}; //Tu przewchowywana bedzie odczytana temperatura, poczatkowo -99-
@@ -116,15 +116,15 @@ int main (void)
 	PORT &= ~((1<<YELLOW) | (1<<GREEN) | (1<<RED)); //Po restarcie mrugniemy wszystkimi diodami testowo
 	_delay_ms(50);
 	PORT |= (1<<YELLOW) | (1<<GREEN) | (1<<RED);
-#ifdef UART	
+#ifdef UART
 	pgm_xmit(mess1);
 	pgm_xmit(mess3);
 	pgm_xmit(mess2);
-#endif	
+#endif
 	wynik_szukania_onewire=dallas_search_identifiers();
 	if(wynik_szukania_onewire) //szukamy urzadzen - 0 gdy przeszukanie udane
 	{
-#ifdef UART		
+#ifdef UART
 		pgm_xmit(mess_err1);
 #endif
 		goto KONIEC;
@@ -136,7 +136,7 @@ int main (void)
 		pgm_xmit(mess_err2);
 #endif
 		goto KONIEC;
-	}	
+	}
 #ifdef UART
 	pgm_xmit(mess_ok);
 #endif
@@ -144,7 +144,7 @@ int main (void)
 	{
 		if(!wybudzenie)
 			mierzTemperature(onewires); //Zlecamy pomiar temperatury
-#ifdef UART		
+#ifdef UART
 		UARTuitoa(wybudzenie_2,napis);
 		string_xmit(napis);
 		xmit(':');
@@ -176,11 +176,11 @@ int main (void)
 #else
 		if(++wybudzenie>37) //Pierwszy licznik liczy do 5 minut (38 x 8 sekund WD)
 #endif
-		{	
+		{
 			wybudzenie=0;
 			wybudzenie_2++; //Drugi licznik to 256 cykli pierwszego licznika, czyli odpowiednio
 		}					// 85 minut lub około 21 godzin
-		
+
 		WDTCR |= (1 << WDIE); //Odnowienie przerwania, czyli odroczenie resetu :)
 		sleep();
 	}
@@ -188,7 +188,7 @@ KONIEC:
 #ifdef UART
 	pgm_xmit(mess_koniec);
 #endif
-	alert(YELLOW);	
+	alert(YELLOW);
 	while(1);
 }
 
@@ -234,7 +234,7 @@ void alert(uint8_t DIODA)
 	_delay_ms(100);
 	PORT &= ~(1<<DIODA);
 	_delay_ms(50);
-	PORT |= (1<<DIODA);	
+	PORT |= (1<<DIODA);
 }
 
 void sleep(void)
@@ -294,7 +294,7 @@ static void odczytajTemperature(DALLAS_IDENTIFIER_LIST_t *onewires,uint8_t *mess
 
 static void pokazTemperature(uint8_t *temperatura, uint16_t poziom_swiatla)
 {
-#ifdef UART	
+#ifdef UART
 	pgm_xmit(mess_wynik1);
 	xmit(temperatura[2]);
 	xmit((temperatura[0]/10)+ASCII_ZERO);
@@ -316,7 +316,7 @@ static void pokazTemperature(uint8_t *temperatura, uint16_t poziom_swiatla)
 		//Temperatura jest optymalna, wezmiemy pod uwage poziom swiatla by nie razic zbytnio diodą w nocy :)
 		//PORT &= ~(1<<GREEN);
 		TCCR0A = 1<<COM0B1 | /*1<<COM0B0 | */ 1<<WGM01 | 1<<WGM00; //Fast PWM on OC0B, clear on compare - set on bottom
-		OCR0B = (poziom_swiatla>>2) & 0xFE; //Obcinamy 2 najmlodsze bity wyniku by miec 8 bitow z pomiaru 
+		OCR0B = (poziom_swiatla>>2) & 0xFE; //Obcinamy 2 najmlodsze bity wyniku by miec 8 bitow z pomiaru
 		// i trzeci zerujemy, aby zielona dioda nigdy nie byla calkiem wygaszona
 		TCCR0B = (1 << CS00); // start timer, no prescale
 		_delay_ms(50);
@@ -324,7 +324,7 @@ static void pokazTemperature(uint8_t *temperatura, uint16_t poziom_swiatla)
 		TCCR0A=0;
 		PORT |= (1<<YELLOW) | (1<<GREEN) | (1<<RED); //Wylaczamy wszystkie LED
 		return;
-		
+
 	}
 	if(temperatura[0] < TEMP_MINIMALNA)
 		PORT &= ~(1<<YELLOW);
@@ -334,7 +334,7 @@ static void pokazTemperature(uint8_t *temperatura, uint16_t poziom_swiatla)
 	PORT |= (1<<YELLOW) | (1<<GREEN) | (1<<RED); //Wylaczamy wszystkie LED
 }
 
-uint16_t getVCC(void) 
+uint16_t getVCC(void)
 {
 	ADCSRA |= (1<<ADEN); //Włączenie przetwornika AD
 	ADCSRA |= (1<<ADPS1) | (1<<ADPS0); //Preskaler 8 dla przetwornika AD (przy 0.5MHz clk)
@@ -352,7 +352,7 @@ uint16_t getVCC(void)
 	ADCSRA &= ~(1<<ADEN); //Wyłączenie przetwornika AD
 	return (uint16_t)(((uint32_t)1024 * 1100) / val);
 }
-uint16_t getLightLevel(void) 
+uint16_t getLightLevel(void)
 {
 	PORT |= (1<<PHOTOTRANSISTOR); //Zasilanie na fototranzystor przez R podciagajacy na porcie
 	ADCSRA |= (1<<ADEN); //Włączenie przetwornika AD
@@ -378,7 +378,7 @@ uint16_t getLightLevel(void)
 	while (ADCSRA & (1<<ADSC));
 	low = ADCL;
 	val += ((ADCH&0x03) << 8) | low;
-	
+
 	ADCSRA &= ~(1<<ADEN); //Wyłączenie przetwornika AD
 	PORT &= ~(1<<PHOTOTRANSISTOR); //Odlaczamy fototranzystor
 	return val/3;
@@ -395,14 +395,13 @@ void pokaz_VCC(uint16_t napiecie_baterii)
 {
 	pgm_xmit(mess_bateria1);
 	pokazLiczbe(napiecie_baterii);
-	pgm_xmit(mess_bateria2);	
-	
+	pgm_xmit(mess_bateria2);
+
 }
 void pokazPoziomSwiatla(uint16_t poziom_swiatla)
 {
 	pgm_xmit(mess_swiatlo1);
 	pokazLiczbe(poziom_swiatla);
-	pgm_xmit(mess_swiatlo2);	
+	pgm_xmit(mess_swiatlo2);
 }
 #endif
-

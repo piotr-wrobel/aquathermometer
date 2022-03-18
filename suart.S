@@ -78,7 +78,7 @@ xmit:
 	cli			;Start critical section
 	com	r24		;C = start bit
 	ldi	r25, 10		;Bit counter
-1:	ldi	r23, BPS-1	;----- Bit transferring loop 
+1:	ldi	r23, BPS-1	;----- Bit transferring loop
 2:	dec	r23     	;Wait for a bit time
 	brne	2b		;/
 	brcs	3f		;MISO = bit to be sent
@@ -131,5 +131,3 @@ rcvr:
 	sei
 	ret
 .endfunc
-
-

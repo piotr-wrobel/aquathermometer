@@ -3,13 +3,13 @@
  *
  * The main documentation is in dallas_one_wire.c.
  */
- 
+
 /******************************************************************************
- * Copyright © 2010, Mike Roddewig (mike@dietfig.org).
+ * Copyright ï¿½ 2010, Mike Roddewig (mike@dietfig.org).
  * All rights reserved.
  *
  * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License v3 as published 
+ * it under the terms of the GNU General Public License v3 as published
  * by the Free Software Foundation.
  *
  * This program is distributed in the hope that it will be useful,
